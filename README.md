@@ -19,5 +19,13 @@ We are adopting the following setting:
 ### Accuracy of LPT model
 <a href="https://colab.research.google.com/github/EiffL/LPTLensingComparison/blob/main/notebooks/LPTLensingAccuracyTest.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
-We check that our LPT model has sufficient resolution to reproduce the linear theory angular power spectra.
+We check that our LPT model has sufficient resolution to reproduce the linear theory angular power spectra (i.e. without halofit).
 ![image](https://github.com/EiffL/LPTLensingComparison/assets/861591/05e19df0-db65-4527-a93e-455f78d66726)
+
+### Inference
+<a href="https://colab.research.google.com/github/EiffL/LPTLensingComparison/blob/main/notebooks/Inference.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+
+Given that we have a matching theory for our numerical simulator, we can easily compute the 2pt posterior of a simulated map, as well as the full-field posterior by HMC.
+
+Preliminary (unconverged) results:
+![image](https://github.com/EiffL/LPTLensingComparison/assets/861591/3712ae4e-d95c-4341-8ee5-a6bb7120f1e4)
