@@ -28,4 +28,4 @@ We check that our LPT model has sufficient resolution to reproduce the linear th
 Given that we have a matching theory for our numerical simulator, we can easily compute the 2pt posterior of a simulated map, as well as the full-field posterior by HMC.
 
 Preliminary (unconverged) results:
-![image](https://github.com/EiffL/LPTLensingComparison/assets/861591/3712ae4e-d95c-4341-8ee5-a6bb7120f1e4)
+![image](https://github.com/EiffL/LPTLensingComparison/assets/861591/aad2834d-4252-4e31-94ab-13e91b56fb1f)
