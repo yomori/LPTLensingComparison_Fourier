@@ -156,7 +156,7 @@ def pixel_window_function(l, pixel_size_arcmin):
     return W_l
 
 
-def make_2pt_model(pixel_scale, ell):
+def make_2pt_model(pixel_scale, ell, sigma_e=0.3):
     """
     Create a function that computes the theoretical 2-point correlation function for a given cosmology and redshift distribution.
 
@@ -169,7 +169,7 @@ def make_2pt_model(pixel_scale, ell):
     """
    
     def forward_model(cosmo, nz_shear):      
-        tracer = jc.probes.WeakLensing(nz_shear)
+        tracer = jc.probes.WeakLensing(nz_shear, sigma_e=sigma_e)
         cell_theory = jc.angular_cl.angular_cl(cosmo, ell, [tracer], nonlinear_fn=jc.power.linear)
         cell_theory = cell_theory * pixel_window_function(ell, pixel_scale)
         cell_noise = jc.angular_cl.noise_cl(ell,[tracer])
