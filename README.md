@@ -15,3 +15,8 @@ We are adopting the following setting:
 
 ![image](https://github.com/EiffL/LPTLensingComparison/assets/861591/8a068d7e-8df4-4ac8-81e5-00efccd70111)
 
+### Accuracy of LPT model
+<a href="https://colab.research.google.com/github/EiffL/LPTLensingComparison/blob/main/notebooks/LPTLensingAccuracyTest.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+
+We check that our LPT model has sufficient resolution to reproduce the linear theory angular power spectra.
+![image](https://github.com/EiffL/LPTLensingComparison/assets/861591/05e19df0-db65-4527-a93e-455f78d66726)
