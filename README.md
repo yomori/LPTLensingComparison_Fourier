@@ -51,10 +51,11 @@ The main simulation setting in this series of papers uses the following setup:
 - **galaxy ellipticity dispersion**: 0.3
 - **lightcone volume**: 1 x 1 x 4.5 Gpc/h
 - **lightcone resolution**: 64 x 64 x 128 voxels
-  
-![image](https://github.com/EiffL/LPTLensingComparison/assets/861591/68ca4572-40bb-4117-90be-52f19c2f81ea)
+
+![image](https://github.com/EiffL/LPTLensingComparison/assets/861591/024a8099-911d-4bdd-afe7-8dc284f21be2)
 ![image](https://github.com/EiffL/LPTLensingComparison/assets/861591/92f20cf1-c32f-4923-b781-63bde07aa0c3)
 
 We find that this resolution is not quite sufficient for the LPT model to converge to expected linear theory, but note that is a detail, mostly irrelevant to the story of this line of papers.
-![image](https://github.com/EiffL/LPTLensingComparison/assets/861591/0a3ddf15-54f9-481a-afef-0290ec490392)
+![image](https://github.com/EiffL/LPTLensingComparison/assets/861591/0ff91152-1771-4490-807a-a1241d5ee128)
+
 
