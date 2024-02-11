@@ -38,6 +38,7 @@ Preliminary (unconverged) results:
 ## Reproducing results from the litterature
 
 ### [Porqueres et al. 2023](https://arxiv.org/abs/2304.04785)
+<a href="https://colab.research.google.com/github/EiffL/LPTLensingComparison/blob/main/notebooks/AccuracyTest_Porqueres2023.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 Here, we tune our simulator to match the setting of the series of papers led by Natalia Porqueres:
 - **Field-level inference of cosmic shear with intrinsic alignments and baryons** https://arxiv.org/abs/2304.04785
