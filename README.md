@@ -58,4 +58,7 @@ The main simulation setting in this series of papers uses the following setup:
 We find that this resolution is not quite sufficient for the LPT model to converge to expected linear theory, but note that is a detail, mostly irrelevant to the story of this line of papers.
 ![image](https://github.com/EiffL/LPTLensingComparison/assets/861591/0ff91152-1771-4490-807a-a1241d5ee128)
 
+Within this model, we compare the full field constraints against a 2pt-function equivalent by doing SBI from the power spectra <a href="https://colab.research.google.com/github/EiffL/LPTLensingComparison/blob/main/notebooks/InferencePorqueres2023.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+![image](https://github.com/EiffL/LPTLensingComparison/assets/861591/f064a406-5a5f-4d5d-b0dc-794778e4972e)
+
 
