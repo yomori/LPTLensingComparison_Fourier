@@ -52,9 +52,8 @@ The main simulation setting in this series of papers uses the following setup:
 - **lightcone resolution**: 64 x 64 x 128 voxels
   
 ![image](https://github.com/EiffL/LPTLensingComparison/assets/861591/68ca4572-40bb-4117-90be-52f19c2f81ea)
-
-We find that this resolution is not quite sufficient for the LPT model to converge to expected linear theory, but note that is a detail, mostly irrelevant to the story of this line of papers.
 ![image](https://github.com/EiffL/LPTLensingComparison/assets/861591/92f20cf1-c32f-4923-b781-63bde07aa0c3)
 
+We find that this resolution is not quite sufficient for the LPT model to converge to expected linear theory, but note that is a detail, mostly irrelevant to the story of this line of papers.
 ![image](https://github.com/EiffL/LPTLensingComparison/assets/861591/0a3ddf15-54f9-481a-afef-0290ec490392)
 
