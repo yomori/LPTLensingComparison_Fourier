@@ -9,9 +9,13 @@ import jax_cosmo.constants as constants
 import numpyro
 import numpyro.distributions as dist
 
-from jaxpm.pm import pm_forces, growth_factor
+from jaxpm.pm import pm_forces, growth_factor, lpt, make_ode_fn
 from jaxpm.kernels import fftk
-from jaxpm.painting import cic_paint, compensate_cic
+from jaxpm.painting import cic_paint, compensate_cic, cic_paint_2d
+from jaxpm.utils import gaussian_smoothing
+
+import diffrax 
+from diffrax import diffeqsolve, ODETerm, Dopri5, SaveAt
 
 import astropy.units as u
 
@@ -29,14 +33,90 @@ def linear_field(mesh_shape, box_size, pk, field):
   field = jnp.fft.irfftn(field)
   return field
 
-def lpt_lightcone(cosmo, initial_conditions, positions, a, mesh_shape):
+def lpt_lightcone(cosmo, initial_conditions, positions, a, mesh_shape, box_size):
     """
-    Computes first order LPT displacement
+    Computes first order LPT lightcone
     """
     initial_force = pm_forces(positions, delta=initial_conditions).reshape(mesh_shape+[3])
     a = jnp.atleast_1d(a)
     dx = growth_factor(cosmo, a).reshape([1,1,-1,1]) * initial_force
-    return dx.reshape([-1,3])
+    dx.reshape([-1,3])
+
+    # Paint the particles on a new mesh
+    lightcone = cic_paint(jnp.zeros(mesh_shape),  positions+dx)
+    # Apply de-cic filter to recover more signal on small scales
+    lightcone = compensate_cic(lightcone)
+
+    dx = box_size[0] / mesh_shape[0]
+    dz = box_size[-1] / mesh_shape[-1]
+    return lightcone, a, dx, dz
+
+def pm_lightcone(cosmo, initial_conditions, positions, a_init, mesh_shape, box_size,
+                 density_plane_width, density_plane_npix, density_plane_smoothing):
+  """ Computes lensplane lightcone using a PM simulation
+  """
+
+  def density_plane_fn(t, y, args):
+    """ Callback function to paint density plane
+    """
+    cosmo, _ , density_plane_width, density_plane_npix  = args
+    positions = y[0]
+    nx, ny, nz = mesh_shape
+
+    # Converts time t to comoving distance in voxel coordinates
+    w = density_plane_width / box_size[2] * mesh_shape[2]
+    center = jc.background.radial_comoving_distance(cosmo, t) / box_size[2] * mesh_shape[2]
+
+    xy = positions[..., :2]
+    d = positions[..., 2]
+
+    # Apply 2d periodic conditions
+    xy = jnp.mod(xy, nx)
+
+    # Rescaling positions to target grid
+    xy = xy / nx * density_plane_npix
+
+    # Selecting only particles that fall inside the volume of interest
+    weight = jnp.where((d > (center - w / 2)) & (d <= (center + w / 2)), 1., 0.)
+
+    # Painting density plane
+    density_plane = cic_paint_2d(jnp.zeros([density_plane_npix, density_plane_npix]), xy, weight)
+
+    # Apply density normalization
+    density_plane = density_plane / ((nx / density_plane_npix) *
+                                     (ny / density_plane_npix) * w)
+    return density_plane
+
+  # LPT initilization 
+  dx, p, _ = lpt(cosmo, initial_conditions, positions, a_init)
+
+  # Define parameters of the simulation
+  n_lens    = int(box_size[-1] // density_plane_width)
+  r         = jnp.linspace(0., box_size[-1], n_lens + 1)
+  r_center  = 0.5 * (r[1:] + r[:-1])
+  a_center  = jc.background.a_of_chi(cosmo, r_center)
+
+  # Define the ODE solver
+  term      = ODETerm(make_ode_fn(mesh_shape))
+  solver    = Dopri5()
+  saveat    = SaveAt(ts=a_center[::-1], fn=density_plane_fn)
+  
+  solution  = diffeqsolve(term, solver, t0=0.01, t1=1., dt0=0.05,
+                          y0        = jnp.stack([positions+dx, p], axis=0),
+                          args      = (cosmo, ),
+                          saveat    = saveat,
+                          adjoint   = diffrax.RecursiveCheckpointAdjoint(5),
+                          max_steps = 32)
+
+  dx = box_size[0] / density_plane_npix
+  dz = density_plane_width
+
+  lightcone = jax.vmap(lambda x: gaussian_smoothing(x, density_plane_smoothing / dx ))(solution.ys)
+  # Reorder the ligtcone to have the first lens plane at the end
+  lightcone = jnp.transpose(lightcone[::-1],axes=(1, 2, 0))
+  a = solution.ts[::-1]
+
+  return lightcone, a, dx, dz
 
 def convergence_Born(cosmo,
                      density_planes,
@@ -84,7 +164,11 @@ def convergence_Born(cosmo,
   return convergence.sum(axis=0)
 
 def make_full_field_model(field_size, field_npix, 
-                          box_shape, box_size):
+                          box_shape, box_size, 
+                          pm=False, 
+                          pm_density_plane_width=None, 
+                          pm_density_plane_npix=None, 
+                          pm_density_plane_smoothing=None):
 
   def forward_model(cosmo, nz_shear, initial_conditions):
     # Create a small function to generate the matter power spectrum
@@ -105,16 +189,12 @@ def make_full_field_model(field_size, field_npix,
     cosmo = jc.Cosmology(Omega_c=cosmo.Omega_c, sigma8=cosmo.sigma8, Omega_b=cosmo.Omega_b,
                         h=cosmo.h, n_s=cosmo.n_s, w0=cosmo.w0, Omega_k=0., wa=0.)
     
-    # Initial displacement
-    dx = lpt_lightcone(cosmo, lin_field, particles, a, box_shape)
-
-    # Paint the particles on a new mesh
-    lightcone = cic_paint(jnp.zeros(box_shape),  particles+dx)
-    # Apply de-cic filter to recover more signal on small scales
-    lightcone = compensate_cic(lightcone)
-
-    dx = box_size[0] / box_shape[0]
-    dz = box_size[-1] / box_shape[-1]
+    # Generate a lightcone with either a PM ot LPT simulation
+    if pm:
+      lightcone, a, dx, dz  = pm_lightcone(cosmo, lin_field, particles, a, box_shape, box_size,
+                                           pm_density_plane_width, pm_density_plane_npix, pm_density_plane_smoothing)
+    else:
+      lightcone, a, dx, dz  = lpt_lightcone(cosmo, lin_field, particles, a, box_shape)
 
     # Defining the coordinate grid for lensing map
     xgrid, ygrid = np.meshgrid(np.linspace(0, field_size, box_shape[0], endpoint=False), # range of X coordinates
@@ -138,7 +218,11 @@ def make_full_field_model(field_size, field_npix,
 # Build the probabilistic model
 def full_field_probmodel(config):
   forward_model = make_full_field_model(config.field_size, config.field_npix,
-                                        config.box_shape, config.box_size)
+                                        config.box_shape, config.box_size,
+                                        pm=config.pm,
+                                        pm_density_plane_width=config.pm_density_plane_width,
+                                        pm_density_plane_npix=config.pm_density_plane_npix,
+                                        pm_density_plane_smoothing=config.pm_density_plane_smoothing)
   
   # Sampling the cosmological parameters
   cosmo = config.fiducial_cosmology(**{k: numpyro.sample(k, v) for k, v in config.priors.items()})
