@@ -54,6 +54,7 @@ parser.add_argument('--lensplane_width'    , nargs=1, type=int, help='Third set 
 #parser.add_argument('--output_npix'        , nargs=1, type=int, help='Third set of three numbers')
 parser.add_argument('--butterworth'        , nargs=2, type=float, help='Third set of three numbers')
 parser.add_argument('--runname'            , nargs=1, type=str, help='Third set of three numbers')
+parser.add_argument('--dir_out'            , nargs=1, type=str, help='Third set of three numbers')
 
 args           = parser.parse_args()
 method         = args.method
@@ -63,6 +64,7 @@ resume_state   = args.resume_state
 #box_size       = args.box_size
 cube_size       = args.cube_size
 cubegrid_size   = args.cubegrid_size
+dir_out        = args.dir_out
 
 
 #output_npix    = args.output_npix
@@ -74,6 +76,7 @@ density_plane_width     = args.lensplane_width
 name                    = args.runname
 cube_size               = cube_size[0]
 cubegrid_size           = cubegrid_size[0]
+dir_out                 = dir_out[0]
 #density_plane_npix      = density_plane_npix[0]
 #density_plane_smoothing = density_plane_smoothing[0]
 density_plane_width     = density_plane_width[0]
@@ -108,7 +111,7 @@ C = Cuboid(u1,u2,u3) #4.1231 0.3430 0.7071
 transform = jax.vmap(C.Transform, in_axes=0)
 
 
-dir='/net/scratch/yomori/sampletest/'
+#dir='/net/scratch/yomori/sampletest/'
 
 #field_size = jnp.arctan2(box_size[0],box_size[-1])/jnp.pi*180.
 
@@ -642,7 +645,6 @@ np.save('/net/scratch/yomori/kappa_noiseless_1.npy',model_trace['kappa_noiseless
 np.save('/net/scratch/yomori/kappa_noiseless_2.npy',model_trace['kappa_noiseless_2']['value'])
 '''
 
-dir_out='/net/scratch/yomori/configtest/'
 jnp.savez(dir_out+'original_trace_%d_cubesize_%d_cubegridsize_%d_rebinned2.npz'%(run,cube_size,cubegrid_size),
                               kappa_1=model_trace['kappa_noiseless_0']['value'],
                               kappa_2=model_trace['kappa_noiseless_1']['value'],
@@ -678,17 +680,17 @@ nuts_kernel = numpyro.infer.NUTS(
                                                                                             #'real_part': model_trace['real_part']['value'],
                                                                                             #'imag_part': model_trace['imag_part']['value'],
                                                                                              }),
-                                max_tree_depth = 5,
-                                step_size      = 3.0e-3
+                                max_tree_depth = 6,
+                                step_size      = 1.0e-3
                                 )
 
 
 mcmc = numpyro.infer.MCMC(
                         nuts_kernel, 
                         num_warmup   = 0,
-                        num_samples  = 40,
+                        num_samples  = 80,
                         num_chains   = 1,
-                        thinning     = 10,
+                        thinning     = 5,
                         progress_bar = True
                         )
 
@@ -708,13 +710,26 @@ if resume_state<0:
     # R_hat : The potential scale reduction factor, which indicates how well the chains have converged (values close to 1.0 are good).
     
     #Save cosmo parameters
-    np.save(dir+'cosmo_%s_%d_0.npy'%(name,run) ,np.c_[res['omega_c'],res['sigma8']])
+    np.save(dir_out+'cosmo_%s_%d_0.npy'%(name,run) ,np.c_[res['omega_c'],res['sigma8']])
 
     # Saving an intermediate checkpoint
-    with open(dir+'%s_%d_0.pickle'%(name,run), 'wb') as handle:
+    with open(dir_out+'%s_%d_0.pickle'%(name,run), 'wb') as handle:
         pickle.dump(res, handle, protocol=pickle.HIGHEST_PROTOCOL)
     del res
 
     final_state = mcmc.last_state
-    with open(dir+'/state_%s_%d_0.pkl'%(name,run), 'wb') as f:
+    with open(dir_out+'/state_%s_%d_0.pkl'%(name,run), 'wb') as f:
         pickle.dump(final_state, f)
+else:
+    with open(dir_out+'state_%s_%d_%d.pkl'%(name,run,resume_state), 'rb') as f:
+        mcmc.post_warmup_state = pickle.load(f)
+    for i in range(resume_state+1,resume_state+50):
+        mcmc.run(mcmc.post_warmup_state.rng_key)
+        res = mcmc.get_samples()
+        with open(dir_out+'/%s_%d_%d.pickle'%(name,run,i), 'wb') as handle:
+            pickle.dump(res, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        del res
+
+        final_state = mcmc.last_state
+        with open(dir_out+'/state_%s_%d_%d.pkl'%(name,run,i), 'wb') as f:
+            pickle.dump(final_state, f)
