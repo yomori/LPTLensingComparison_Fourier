@@ -114,6 +114,14 @@ u3=(0, 1, 0)
 #u2=(2, 1, 0)
 #u3=(0, 0, 1)
 
+def even(X):
+    Y=jnp.int32(jnp.round(X))
+    if Y % 2 == 0:
+        return Y + 2
+    else:
+        return Y + 1
+
+
 L1,L2,L3=remap_Lbox(u1=u1, u2=u2, u3=u3)
 box_size=[L1*cube_size,L2*cube_size,L3*cube_size]
 print(box_size)
@@ -124,6 +132,9 @@ print(box_size)
 out_dim=[int(np.ceil(cubegrid_size*L1)),int(np.ceil(cubegrid_size*L2)),int(np.ceil(cubegrid_size*L3))]
 print(out_dim)
 
+dimx=even(out_dim[1])
+dimy=even(out_dim[2])
+print(dimx,dimy)
 
 #3 2 2   1 1 1   0 0 1
 ######## Transformation
@@ -139,7 +150,7 @@ field_size = [jnp.arctan2(box_size[1],box_size[0])/jnp.pi*180., jnp.arctan2(box_
 print('Field size: %.2fx%.2f=%.2f'%(field_size[0],field_size[1],(field_size[0]*field_size[1])))
 
 zz       = jnp.linspace(0, 1.5, 1000)
-mu       = jnp.array([0.7,0.95,1.05]) #0.95
+mu       = jnp.array([0.6,0.7,0.8]) #0.95
 sigma_z  = jnp.array([0.05,0.05,0.05]) #0.025
 ngal     = jnp.array([1.00,1.00,1.00])
 sigma_e  = jnp.array([0.26,0.26,0.26])
@@ -161,21 +172,21 @@ def filter(pix_size, N, l0, n):
     y  = 1/(1+(l/l0)**(2*n) )**0.5 # Butterworth filter
     f  = np.interp(ell2d.flatten(),l,y,right=0).reshape((N,N))
     return f
-
+'''
 
 #filt2d = filter(field_size*60/output_npix,output_npix,butterworth[0],butterworth[1])
 #aa     = np.linalg.solve(noisecov, np.eye(noisecov.shape[0]))
 
-print('Computing filter')
-filt2d = filter(field_size*60/output_npix,output_npix,butterworth[0],butterworth[1])
 
+'''
 print('Computing noisecov')
 if ~np.all(sigma_e == sigma_e[0]):
     raise ValueError(f"For now sigma_e has to be same for all bins")
 if ~np.all(ngal == ngal[0]):
     raise ValueError(f"For now ngal has to be same for all bins")
+'''
 
-
+'''
 file_noisecov='noisecov.npy'
 
 if os.path.exists(file_noisecov):
@@ -201,11 +212,35 @@ noisecov = np.cov(ret)
 
 np.save('noisecov.py',noisecov)
 '''
+'''
+npix     =  out_dim[1]
+pix_size = field_size[1]*60/npix
+
+print('Computing filter')
+filt2d = filter(pix_size,npix,butterworth[0],butterworth[1])
+
+ret      = np.zeros((int(npix*npix) ,50000))
+
+for i in range(0,50000):
+    tmp      = np.random.normal(np.zeros((npix ,npix )), sigma_e[0]/np.sqrt(ngal[0]*(pix_size)**2)) 
+    y=fft.fft2(tmp)
+    y=fft.fftshift(y)
+    ret[:,i] = fft.ifft2(fft.fftshift(y*filt2d)).real.flatten()
 
 #scale_tril = scipy.linalg.cholesky(noisecov, lower=True)
+noisecov   = np.cov(ret)
+'''
 
+'''
+npix     =  dimx
+pix_size = field_size[1]*60/npix
+filt2d   = filter(pix_size,npix,butterworth[0],butterworth[1])
+#import pdb;pdb.set_trace()
 
-
+noisecov   = np.load('original_trace_pm_1001_cubesize_340_cubegridsize_180_rebinned2_midpointnoisecov_sige0.26_ngal1_%d_%d.npz.npy'%(butterworth[0],butterworth[1] ) )
+scale_tril = scipy.linalg.cholesky(noisecov+np.eye(noisecov.shape[0])*1e-10 , lower=True)
+del noisecov
+'''
 
 def linear_field(mesh_shape, box_size, pk):
     """Generate initial conditions"""
@@ -283,10 +318,15 @@ def make_full_field_model(field_size, cube_size, cubegrid_size, box_size, out_di
 
         #jax.debug.print("boxsize[0]: {}", box_size[0] )
         #jax.debug.print("w: {}", w)
-
+        #jax.debug.print("t: {}",t)
+        
         # Converts time t to comoving distance in voxel coordinates
-        center = jax.numpy.interp(t, jnp.linspace(0.005,1,500), cc) # comoving radial distance in Mpc/h
-
+        center = cc#jax.numpy.interp(t, jnp.linspace(0.005,1,5000), cc) # comoving radial distance in Mpc/h
+        #a_center  = jc.background.a_of_chi(cosmo, cc)
+        idx = jnp.where(cc[:, 0] == t, size=1)[0]
+        center = jnp.where(idx.size > 0, cc[idx, 1], -1)
+        #jax.debug.print("cubemax x: {}", jnp.max(positions[:,0]))
+        
         #jax.debug.print("cubemax x: {}", jnp.max(positions[:,0]))
         #jax.debug.print("cubemin x: {}", jnp.min(positions[:,0]))
         #jax.debug.print("cubemax y: {}", jnp.max(positions[:,1]))
@@ -309,9 +349,11 @@ def make_full_field_model(field_size, cube_size, cubegrid_size, box_size, out_di
         # Selecting only particles that fall inside the volume of interest
         #jax.debug.print("dmin : {}", d.min())
         #jax.debug.print("dmax : {}", d.max())
+
+        #jax.debug.print("density_plane_width: {}",density_plane_width)
         
-        #jax.debug.print("min slice: {}", (center - density_plane_width / 2))
         #jax.debug.print("max slice: {}", (center + density_plane_width / 2))
+        #jax.debug.print("min slice: {}", (center - density_plane_width / 2))
         weight = jnp.where((d > (center - density_plane_width / 2)) & (d <= (center + density_plane_width / 2)), 1., 0.) # 243.40892, w=25
         #jax.debug.breakpoint(num_frames=1)
 
@@ -327,9 +369,8 @@ def make_full_field_model(field_size, cube_size, cubegrid_size, box_size, out_di
         return density_plane
         
         
-        #return y#positions
-        
-    #@jax.jit
+   
+    @jax.jit
     def neural_nbody_ode(a, state, args):
         """
         state is a tuple (position, velocities ) in internal units: [grid units, v=\frac{a^2}{H_0}\dot{x}]
@@ -403,12 +444,16 @@ def make_full_field_model(field_size, cube_size, cubegrid_size, box_size, out_di
 
             #density_plane_smoothing = 0.0001
             
-            a_init    = 0.01
+            a_init    = 0.0476
             n_lens    = int(box_size[0] // density_plane_width)
-            r         = jnp.linspace(0., box_size[0], n_lens + 1)
+            r         = jnp.arange(n_lens+1)*density_plane_width #jnp.linspace(0., box_size[0], n_lens + 1)
             r_center  = 0.5 * (r[1:] + r[:-1])
+            #jax.debug.print("r_center: {}",r_center)
+        
             a_center  = jc.background.a_of_chi(cosmo, r_center)
-            cc        = jc.background.radial_comoving_distance(cosmo, jnp.linspace(0.005,1,500)) 
+            #jax.debug.print("a_center: {}",a_center)
+        
+            #cc        = jc.background.radial_comoving_distance(cosmo, jnp.linspace(0.005,1,5000)) 
 
             eps, p    = lpt_lightcone(cosmo, lin_field, particles, a_init, [cubegrid_size,cubegrid_size,cubegrid_size])
             term      = ODETerm(neural_nbody_ode)
@@ -417,9 +462,9 @@ def make_full_field_model(field_size, cube_size, cubegrid_size, box_size, out_di
             
             solution  = diffeqsolve(term, solver, t0=a_init, t1=1., dt0=0.05,
                                     y0        = jnp.stack([particles+eps, p], axis=0),
-                                    args      = (cosmo, None, density_plane_width, density_plane_npix, cc ),
+                                    args      = (cosmo, None, density_plane_width, density_plane_npix, jnp.c_[a_center,r_center] ),
                                     saveat    = saveat,
-                                    adjoint   = diffrax.RecursiveCheckpointAdjoint(3),
+                                    adjoint   = diffrax.RecursiveCheckpointAdjoint(6),
                                     max_steps = 32)
 
             #solution  = diffeqsolve(term, solver, t0=a_init, t1=1., dt0=0.02,
@@ -493,13 +538,13 @@ def make_full_field_model(field_size, cube_size, cubegrid_size, box_size, out_di
         resample_factor  = (convergence_maps[0].shape[0] // out_dim[1], convergence_maps[0].shape[1] // out_dim[0])
         convergence_maps = [kmap.reshape([out_dim[1], resample_factor[0],  out_dim[0], resample_factor[1] ]).mean(axis=1).mean(axis=-1) for kmap in convergence_maps]
 
+
         #jax.debug.print("Npix x in: {}", convergence_maps[0].shape[0] )
         #jax.debug.print("Npix y in: {}", convergence_maps[0].shape[1] )
         
         #jax.debug.breakpoint()
-        #jax.clear_caches()
-        return convergence_maps#, dplanes
-        #return dplanes
+        jax.clear_caches()
+        return convergence_maps
 
     return forward_model
 
@@ -511,28 +556,16 @@ def make_full_field_model(field_size, cube_size, cubegrid_size, box_size, out_di
 #jnp.ceil(box_size[2])
 #jax.debug.breakpoint(num_frames=1)
 
-def even(X):
-    Y=jnp.int32(jnp.round(X))
-    if Y % 2 == 0:
-        return Y + 2
-    else:
-        return Y + 1
-
-
-
-dimx=even(out_dim[1])
-dimy=even(out_dim[2])
-
 # Generate the forward model given these survey settings
-lensing_model = jax.jit(make_full_field_model( field_size = field_size,
-                                               cube_size   = cube_size,
+lensing_model = jax.jit(make_full_field_model( field_size     = field_size,
+                                               cube_size      = cube_size,
                                                cubegrid_size  = cubegrid_size,
-                                               box_size   = box_size,
-                                               method     = method,
+                                               box_size       = box_size,
+                                               method         = method,
                                                density_plane_width = density_plane_width,
-                                               density_plane_npix  = [int(dimx)*8,int(dimy)*8],
-                                               out_dim             = [int(dimx),int(dimy)],
-                                               transform=transform
+                                               density_plane_npix  = [int(dimx)*10,int(dimy)*10],
+                                               out_dim             = [int(dimx),int(dimy) ],
+                                               transform      = transform,
                                              ))
 
 def model():
@@ -572,9 +605,19 @@ def model():
     numpyro.deterministic('kappa_noiseless_1', convergence_maps[1])
     numpyro.deterministic('kappa_noiseless_2', convergence_maps[2])
 
+    observed_maps = [numpyro.sample('kappa_%d'%i,dist.Normal(k, 0.26/jnp.sqrt(ngal[i]*(field_size[0]*60/out_dim[0])*(field_size[1]*60/out_dim[1])  ) ))
+                     for i,k in enumerate(convergence_maps)]   #gal/arcmin2 * arcmin2/pixL**2
 
-    observed_maps = [numpyro.sample('kappa_%d'%i,dist.Normal(k, 0.26/jnp.sqrt(1*(field_size[0]*60/out_dim[0])*(field_size[1]*60/out_dim[1])  ) ))
-                     for i,k in enumerate(convergence_maps)]
+
+    #------------- Apply smoothing ---------------------
+    '''
+    obs_lp = []
+    for i,k in enumerate(convergence_maps):
+        #jax.debug.breakpoint(num_frames=1)
+        obs_lp.append( fft.ifft2(fft.fftshift(fft.fftshift(fft.fft2(convergence_maps[i] ))*filt2d)).real)
+
+    observed_maps = [numpyro.sample('kappa_%d'%i, dist.MultivariateNormal(obs_lp[i].flatten(), scale_tril=scale_tril  )) for i in range(len(convergence_maps)) ]
+    '''
 
     numpyro.deterministic('kappa_output_0', observed_maps[0])
     numpyro.deterministic('kappa_output_1', observed_maps[1])
@@ -605,7 +648,7 @@ np.save('/net/scratch/yomori/kappa_noiseless_1.npy',model_trace['kappa_noiseless
 np.save('/net/scratch/yomori/kappa_noiseless_2.npy',model_trace['kappa_noiseless_2']['value'])
 '''
 
-jnp.savez(dir_out+'original_trace_pm_%d_cubesize_%d_cubegridsize_%d_rebinned2.npz'%(run,cube_size,cubegrid_size),
+jnp.savez(dir_out+'original_trace_pm_%d_cubesize_%d_cubegridsize_%d_rebinned2_midpoint.npz'%(run,cube_size,cubegrid_size),
                               kappa_1=model_trace['kappa_noiseless_0']['value'],
                               kappa_2=model_trace['kappa_noiseless_1']['value'],
                               kappa_3=model_trace['kappa_noiseless_2']['value'],
@@ -621,7 +664,7 @@ jnp.savez(dir_out+'original_trace_pm_%d_cubesize_%d_cubegridsize_%d_rebinned2.np
                               #output_npix_y=model_trace['noiseless_convergence_0']['value'].shape[1],
                               )
 
-sys.exit()
+#sys.exit()
 
 #Set "Fake data"
 observed_model = condition(model, {'kappa_0': model_trace['kappa_0']['value'],
@@ -648,9 +691,9 @@ nuts_kernel = numpyro.infer.NUTS(
 mcmc = numpyro.infer.MCMC(
                         nuts_kernel, 
                         num_warmup   = 0,
-                        num_samples  = 120,
+                        num_samples  = 2,
                         num_chains   = 1,
-                        thinning     = 10,
+                        #thinning     = 1,
                         progress_bar = True
                         )
 
