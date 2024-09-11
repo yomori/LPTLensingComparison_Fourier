@@ -1,0 +1,15 @@
+#!/bin/bash
+#SBATCH --job-name=jaxpm
+#SBATCH -t 11:59:00
+#SBATCH --partition=ai+s
+#SBATCH --array=102-102
+#SBATCH --gpus=1
+#SBATCH --gpus-per-task=1
+
+eval "$(/home/yomori/miniconda3/bin/conda shell.bash hook)"; conda activate /home/yomori/envs/ba4
+
+dir_out=/net/scratch/yomori/sampletest/
+python original_cube_v2.py pm $SLURM_ARRAY_TASK_ID -1 --cube_size 340 --cubegrid_size 180 --lensplane_width 25 --butterworth 800 12 --dir_out $dir_out
+
+
+

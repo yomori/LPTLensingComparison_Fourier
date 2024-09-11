@@ -55,6 +55,7 @@ parser.add_argument('--lensplane_width'    , nargs=1, type=int, help='Third set 
 parser.add_argument('--butterworth'        , nargs=2, type=float, help='Third set of three numbers')
 parser.add_argument('--runname'            , nargs=1, type=str, help='Third set of three numbers')
 parser.add_argument('--dir_out'            , nargs=1, type=str, help='Third set of three numbers')
+parser.add_argument('--trace'                 , default=False, dest='trace',action='store_true')
 
 args           = parser.parse_args()
 method         = args.method
@@ -65,6 +66,7 @@ resume_state   = args.resume_state
 cube_size       = args.cube_size
 cubegrid_size   = args.cubegrid_size
 dir_out        = args.dir_out
+trace          = args.trace
 
 
 #output_npix    = args.output_npix
@@ -159,7 +161,7 @@ nz_shear = [jc.redshift.kde_nz(zz,nz[i],bw=zz[2]-zz[1], zmax=3.0, gals_per_arcmi
 
 
 # Generate noise covariance matrix
-'''
+
 def filter(pix_size, N, l0, n):
     N     = int(N)
     ones  = np.ones(N)
@@ -172,7 +174,7 @@ def filter(pix_size, N, l0, n):
     y  = 1/(1+(l/l0)**(2*n) )**0.5 # Butterworth filter
     f  = np.interp(ell2d.flatten(),l,y,right=0).reshape((N,N))
     return f
-'''
+
 
 #filt2d = filter(field_size*60/output_npix,output_npix,butterworth[0],butterworth[1])
 #aa     = np.linalg.solve(noisecov, np.eye(noisecov.shape[0]))
@@ -231,16 +233,16 @@ for i in range(0,50000):
 noisecov   = np.cov(ret)
 '''
 
-'''
+
 npix     =  dimx
 pix_size = field_size[1]*60/npix
 filt2d   = filter(pix_size,npix,butterworth[0],butterworth[1])
 #import pdb;pdb.set_trace()
 
-noisecov   = np.load('original_trace_pm_1001_cubesize_340_cubegridsize_180_rebinned2_midpointnoisecov_sige0.26_ngal1_%d_%d.npz.npy'%(butterworth[0],butterworth[1] ) )
+noisecov   = np.load('original_trace_pm_1001_cubesize_%d_cubegridsize_%d_rebinned2_midpointnoisecov_sige0.26_ngal1_%d_%d.npz.npy'%(cube_size,cubegrid_size,butterworth[0],butterworth[1] ) )
 scale_tril = scipy.linalg.cholesky(noisecov+np.eye(noisecov.shape[0])*1e-10 , lower=True)
 del noisecov
-'''
+
 
 def linear_field(mesh_shape, box_size, pk):
     """Generate initial conditions"""
@@ -321,7 +323,7 @@ def make_full_field_model(field_size, cube_size, cubegrid_size, box_size, out_di
         #jax.debug.print("t: {}",t)
         
         # Converts time t to comoving distance in voxel coordinates
-        center = cc#jax.numpy.interp(t, jnp.linspace(0.005,1,5000), cc) # comoving radial distance in Mpc/h
+        #center = cc#jax.numpy.interp(t, jnp.linspace(0.005,1,5000), cc) # comoving radial distance in Mpc/h
         #a_center  = jc.background.a_of_chi(cosmo, cc)
         idx = jnp.where(cc[:, 0] == t, size=1)[0]
         center = jnp.where(idx.size > 0, cc[idx, 1], -1)
@@ -574,10 +576,16 @@ def model():
     """
     Omega_b = 0.0492 
     Omega_c = numpyro.sample("omega_c", dist.Uniform(0.01, 1.5))
-    sigma8  = numpyro.sample("sigma8" , dist.Uniform(0.1, 2.0))
+    #sigma8  = numpyro.sample("sigma8" , dist.Uniform(0.1, 2.0))
+    S8      = numpyro.sample("S8" , dist.Uniform(0.1, 2.0))
     h       = 0.6726 
     w0      = -1     
     n_s     = 0.9645 
+
+    Omega_m = Omega_b + Omega_c
+
+    sigma8  = S8/(Omega_m/0.3)**0.5
+
 
     cosmo   = jc.Cosmology(Omega_c = Omega_c,
                             sigma8  = sigma8,
@@ -588,6 +596,10 @@ def model():
                             w0  = w0,
                             wa  = 0.)
     
+    numpyro.deterministic('sigma8', sigma8)
+    numpyro.deterministic('Omega_m', Omega_m)
+    
+             
      
     # Create a small function to generate the matter power spectrum
     k     = jnp.logspace(-4, 1, 128)
@@ -605,19 +617,19 @@ def model():
     numpyro.deterministic('kappa_noiseless_1', convergence_maps[1])
     numpyro.deterministic('kappa_noiseless_2', convergence_maps[2])
 
-    observed_maps = [numpyro.sample('kappa_%d'%i,dist.Normal(k, 0.26/jnp.sqrt(ngal[i]*(field_size[0]*60/out_dim[0])*(field_size[1]*60/out_dim[1])  ) ))
-                     for i,k in enumerate(convergence_maps)]   #gal/arcmin2 * arcmin2/pixL**2
+    #observed_maps = [numpyro.sample('kappa_%d'%i,dist.Normal(k, 0.26/jnp.sqrt(ngal[i]*(field_size[0]*60/out_dim[0])*(field_size[1]*60/out_dim[1])  ) ))
+    #                 for i,k in enumerate(convergence_maps)]   #gal/arcmin2 * arcmin2/pixL**2
 
 
     #------------- Apply smoothing ---------------------
-    '''
+    
     obs_lp = []
     for i,k in enumerate(convergence_maps):
         #jax.debug.breakpoint(num_frames=1)
         obs_lp.append( fft.ifft2(fft.fftshift(fft.fftshift(fft.fft2(convergence_maps[i] ))*filt2d)).real)
 
-    observed_maps = [numpyro.sample('kappa_%d'%i, dist.MultivariateNormal(obs_lp[i].flatten(), scale_tril=scale_tril  )) for i in range(len(convergence_maps)) ]
-    '''
+    observed_maps = [numpyro.sample('kappa_%d'%i, dist.MultivariateNormal(obs_lp[i].flatten(), scale_tril=scale_tril)) for i in range(len(convergence_maps)) ]
+    
 
     numpyro.deterministic('kappa_output_0', observed_maps[0])
     numpyro.deterministic('kappa_output_1', observed_maps[1])
@@ -627,10 +639,16 @@ def model():
 
 
 # Create a random realization of a map with fixed cosmology
-gen_model    = condition(model, {"omega_c": 0.2664, "sigma8" : 0.831 })
+gen_model     = condition(model, {"omega_c": 0.2664,
+                                  "S8"     : 0.8523,
+                                   })
 
-model_tracer = numpyro.handlers.trace(numpyro.handlers.seed(gen_model, jax.random.PRNGKey(run) ))
-model_trace  = model_tracer.get_trace()
+if trace:
+    model_tracer = numpyro.handlers.trace(numpyro.handlers.seed(gen_model, jax.random.PRNGKey(run) ))
+    model_trace  = model_tracer.get_trace()
+else:
+    model_tracer = numpyro.handlers.trace(numpyro.handlers.seed(gen_model, jax.random.PRNGKey(0) ))
+    model_trace  = model_tracer.get_trace()
 
 #np.save('/net/scratch/yomori//lin_field.npy',model_trace['lin_field']['value'])
 #np.save('/net/scratch/yomori/dplane_0.npy',model_trace['dplane_0']['value'])
@@ -665,6 +683,8 @@ jnp.savez(dir_out+'original_trace_pm_%d_cubesize_%d_cubegridsize_%d_rebinned2_mi
                               )
 
 #sys.exit()
+if trace:
+    sys.exit()
 
 #Set "Fake data"
 observed_model = condition(model, {'kappa_0': model_trace['kappa_0']['value'],
@@ -675,7 +695,8 @@ observed_model = condition(model, {'kappa_0': model_trace['kappa_0']['value'],
 nuts_kernel = numpyro.infer.NUTS(
                                 model=observed_model,
                                 init_strategy = partial(numpyro.infer.init_to_value, values={'omega_c': 0.2664,
-                                                                                             'sigma8' : 0.831,
+                                                                                             #'sigma8' : 0.831,
+                                                                                             "S8" : 0.8523,
                                                                                              'initial_conditions': model_trace['initial_conditions']['value']
                                                                                              #'omega_b': 0.0492,
                                                                                              #'h_0'    : 0.6727,
@@ -683,7 +704,7 @@ nuts_kernel = numpyro.infer.NUTS(
                                                                                             #'real_part': model_trace['real_part']['value'],
                                                                                             #'imag_part': model_trace['imag_part']['value'],
                                                                                              }),
-                                max_tree_depth = 6,
+                                max_tree_depth = 3,
                                 step_size      = 1.0e-3
                                 )
 
@@ -691,9 +712,9 @@ nuts_kernel = numpyro.infer.NUTS(
 mcmc = numpyro.infer.MCMC(
                         nuts_kernel, 
                         num_warmup   = 0,
-                        num_samples  = 2,
+                        num_samples  = 100,
                         num_chains   = 1,
-                        #thinning     = 1,
+                        thinning     = 10,
                         progress_bar = True
                         )
 
@@ -713,14 +734,14 @@ if resume_state<0:
     # R_hat : The potential scale reduction factor, which indicates how well the chains have converged (values close to 1.0 are good).
     
     #Save cosmo parameters
-    np.save(dir_out+'cosmo_%s_%d_0.npy'%(name,run) ,np.c_[res['omega_c'],res['sigma8']])
+    np.save(dir_out+'cosmo_%s_%d_0.npy'%(name,run) ,np.c_[res['omega_c'],res['sigma8'],res['S8'] ])
 
     # Saving an intermediate checkpoint
     with open(dir_out+'%s_%d_0.pickle'%(name,run), 'wb') as handle:
         pickle.dump(res, handle, protocol=pickle.HIGHEST_PROTOCOL)
     del res
 
-    final_state = mcmc.last_stateZZ
+    final_state = mcmc.last_state
     with open(dir_out+'/state_%s_%d_0.pkl'%(name,run), 'wb') as f:
         pickle.dump(final_state, f)
 else:
@@ -730,7 +751,7 @@ else:
         mcmc.run(mcmc.post_warmup_state.rng_key)
         res = mcmc.get_samples()
 
-        np.save(dir_out+'cosmo_%s_%d_%d.npy'%(name,run,i) ,np.c_[res['omega_c'],res['sigma8']])
+        np.save(dir_out+'cosmo_%s_%d_%d.npy'%(name,run,i) ,np.c_[res['omega_c'],res['sigma8'],res['S8']])
 
         with open(dir_out+'/%s_%d_%d.pickle'%(name,run,i), 'wb') as handle:
             pickle.dump(res, handle, protocol=pickle.HIGHEST_PROTOCOL)
