@@ -83,7 +83,7 @@ dir_out                 = dir_out[0]
 #density_plane_smoothing = density_plane_smoothing[0]
 density_plane_width     = density_plane_width[0]
 #output_npix             = output_npix[0]
-name                    = name
+name                    = name[0]
 
 
 # 350/128
@@ -714,7 +714,7 @@ mcmc = numpyro.infer.MCMC(
                         num_warmup   = 0,
                         num_samples  = 2,
                         num_chains   = 1,
-                        thinning     = 10,
+                        #thinning     = 10,
                         progress_bar = True
                         )
 
@@ -744,6 +744,25 @@ if resume_state<0:
     final_state = mcmc.last_state
     with open(dir_out+'/state_%s_%d_0.pkl'%(name,run), 'wb') as f:
         pickle.dump(final_state, f)
+
+    for i in range(1,50):
+        print('round',i,'done')
+        mcmc.post_warmup_state = mcmc.last_state
+        mcmc.run(mcmc.post_warmup_state.rng_key)
+        res = mcmc.get_samples()
+
+        #np.savez(dir+'cosmo_%s_%d_%d.npz'%(name,run,i),omega_c=res['omega_c'],sigma8=res['sigma8'])
+        np.save(dir_out+'cosmo_%s_%d_%d.npy'%(name,run,i),np.c_[res['omega_c'],res['sigma8'],res['S8'] ])
+
+        with open(dir+'%s_%d_%d.pickle'%(name,run,i), 'wb') as handle:
+            pickle.dump(res, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        del res
+
+        final_state = mcmc.last_state
+        with open(dir+'/state_%s_%d_%d.pkl'%(name,run,i), 'wb') as f:
+            pickle.dump(final_state, f)
+
+
 else:
     with open(dir_out+'state_%s_%d_%d.pkl'%(name,run,resume_state), 'rb') as f:
         mcmc.post_warmup_state = pickle.load(f)
