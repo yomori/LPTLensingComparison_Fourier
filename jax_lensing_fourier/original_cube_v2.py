@@ -712,7 +712,7 @@ nuts_kernel = numpyro.infer.NUTS(
 mcmc = numpyro.infer.MCMC(
                         nuts_kernel, 
                         num_warmup   = 0,
-                        num_samples  = 100,
+                        num_samples  = 2,
                         num_chains   = 1,
                         thinning     = 10,
                         progress_bar = True
