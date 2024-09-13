@@ -714,7 +714,7 @@ mcmc = numpyro.infer.MCMC(
                         num_warmup   = 0,
                         num_samples  = 100,
                         num_chains   = 1,
-                        thinning     = 10,
+                        #thinning     = 10,
                         progress_bar = True
                         )
 
@@ -745,6 +745,26 @@ if resume_state<0:
     with open(dir_out+'/state_%s_%d_0.pkl'%(name,run), 'wb') as f:
         pickle.dump(final_state, f)
 
+<<<<<<< HEAD
+=======
+    for i in range(1,50):
+        print('round',i,'done')
+        mcmc.post_warmup_state = mcmc.last_state
+        mcmc.run(mcmc.post_warmup_state.rng_key)
+        res = mcmc.get_samples()
+
+        #np.savez(dir+'cosmo_%s_%d_%d.npz'%(name,run,i),omega_c=res['omega_c'],sigma8=res['sigma8'])
+        np.save(dir_out+'cosmo_%s_%d_%d.npy'%(name,run,i),np.c_[res['omega_c'],res['sigma8'],res['S8'] ])
+
+        with open(dir+'%s_%d_%d.pickle'%(name,run,i), 'wb') as handle:
+            pickle.dump(res, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        del res
+
+        final_state = mcmc.last_state
+        with open(dir+'/state_%s_%d_%d.pkl'%(name,run,i), 'wb') as f:
+            pickle.dump(final_state, f)
+
+>>>>>>> e50a6b545f2783b71d2e5d0c8f17b159cf01d983
 
 else:
     with open(dir_out+'state_%s_%d_%d.pkl'%(name,run,resume_state), 'rb') as f:
