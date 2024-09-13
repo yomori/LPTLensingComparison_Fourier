@@ -745,8 +745,6 @@ if resume_state<0:
     with open(dir_out+'/state_%s_%d_0.pkl'%(name,run), 'wb') as f:
         pickle.dump(final_state, f)
 
-<<<<<<< HEAD
-=======
     for i in range(1,50):
         print('round',i,'done')
         mcmc.post_warmup_state = mcmc.last_state
@@ -764,7 +762,6 @@ if resume_state<0:
         with open(dir+'/state_%s_%d_%d.pkl'%(name,run,i), 'wb') as f:
             pickle.dump(final_state, f)
 
->>>>>>> e50a6b545f2783b71d2e5d0c8f17b159cf01d983
 
 else:
     with open(dir_out+'state_%s_%d_%d.pkl'%(name,run,resume_state), 'rb') as f:
