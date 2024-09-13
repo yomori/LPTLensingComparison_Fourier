@@ -83,7 +83,7 @@ dir_out                 = dir_out[0]
 #density_plane_smoothing = density_plane_smoothing[0]
 density_plane_width     = density_plane_width[0]
 #output_npix             = output_npix[0]
-name                    = name
+name                    = name[0]
 
 
 # 350/128
@@ -704,7 +704,7 @@ nuts_kernel = numpyro.infer.NUTS(
                                                                                             #'real_part': model_trace['real_part']['value'],
                                                                                             #'imag_part': model_trace['imag_part']['value'],
                                                                                              }),
-                                max_tree_depth = 3,
+                                max_tree_depth = 6,
                                 step_size      = 1.0e-3
                                 )
 
@@ -712,7 +712,7 @@ nuts_kernel = numpyro.infer.NUTS(
 mcmc = numpyro.infer.MCMC(
                         nuts_kernel, 
                         num_warmup   = 0,
-                        num_samples  = 2,
+                        num_samples  = 100,
                         num_chains   = 1,
                         thinning     = 10,
                         progress_bar = True
@@ -744,6 +744,8 @@ if resume_state<0:
     final_state = mcmc.last_state
     with open(dir_out+'/state_%s_%d_0.pkl'%(name,run), 'wb') as f:
         pickle.dump(final_state, f)
+
+
 else:
     with open(dir_out+'state_%s_%d_%d.pkl'%(name,run,resume_state), 'rb') as f:
         mcmc.post_warmup_state = pickle.load(f)
