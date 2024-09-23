@@ -714,7 +714,7 @@ mcmc = numpyro.infer.MCMC(
                         num_warmup   = 0,
                         num_samples  = 100,
                         num_chains   = 1,
-                        #thinning     = 10,
+                        thinning     = 10,
                         progress_bar = True
                         )
 
