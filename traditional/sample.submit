@@ -1,0 +1,20 @@
+#!/bin/bash
+#SBATCH -t 72:00:00
+#SBATCH --partition=SPT3G
+#SBATCH --account=SPT3G
+#SBATCH --ntasks=128
+#SBATCH --cpus-per-task=4
+#SBATCH --job-name=pspec
+
+#eval "$(/lcrc/project/SPT3G/users/ac.yomori/scratch/testcobaya3/miniconda/bin/conda shell.bash hook)"
+#conda deactivate
+#conda activate /lcrc/project/SPT3G/users/ac.yomori/scratch/testcobaya3/envs/testenv
+
+source /lcrc/project/SPT3G/users/ac.yomori/setups/setup_analysis.sh
+
+export OMP_NUM_THREADS=4
+
+#mpirun -n 128 python sample2_priors.py
+#mpirun -n 128 python sample2_justine.py
+mpirun -n 128 python sample_base.py 800
+
